@@ -11973,6 +11973,8 @@ code_breakpoint::breakpoint_hit (const struct bp_location *bl,
 				 CORE_ADDR bp_addr,
 				 const target_waitstatus &ws)
 {
+  struct gdbarch *gdbarch;
+
   if (ws.kind () != TARGET_WAITKIND_STOPPED
       || ws.sig () != GDB_SIGNAL_TRAP)
     return 0;
@@ -11980,6 +11982,15 @@ code_breakpoint::breakpoint_hit (const struct bp_location *bl,
   if (!breakpoint_address_match (bl->pspace->aspace.get (), bl->address,
 				 aspace, bp_addr))
     return 0;
+
+  // hack: force overlay table to update if overlay_event is triggered
+  // (isn't this how it's supposed to work? i am certainly missing some way this gets triggered
+  // in existing overlay-supported architectures, or otherwise the feature is just broken)
+  if (overlay_debugging == ovly_auto && this->type == bp_overlay_event) {
+    gdbarch = get_current_arch ();
+    if (gdbarch_overlay_update_p (gdbarch))
+      gdbarch_overlay_update (gdbarch, NULL);
+  }
 
   if (overlay_debugging		/* unmapped overlay section */
       && section_is_overlay (bl->section)
