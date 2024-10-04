@@ -369,30 +369,34 @@ static void nds_overlay_update(struct obj_section *osect)
   if (! simple_read_overlay_table ())
     return;
 
-  /* Now may as well update all sections, even if only one was requested.  */
-  for (objfile *objfile : current_program_space->objfiles ()) {
-    for (obj_section *sect : objfile->sections ()) {
-      if (section_is_overlay (sect))
-	{
-	  int i;
+  // this iterates over cache_novlys in the outer loop and obj_section in the inner loop.
+  // this is reversed from simple_overlay_update. why? because pokeplat (and presumably other NDS games)
+  // generate multiple debug sections for each overlay (one points at start addr, one points at end)
+  // because of this, there will be 2 sections matching any loaded overlay, but we only want to load the first.
+  // therefore, we find the FIRST matching section, then break, and skip the remaining sections for that ovly.
+  int i;
+  for (i = 0; i < cache_novlys; i++) {
+    for (objfile *objfile : current_program_space->objfiles ()) {
+      for (obj_section *sect : objfile->sections ()) {
+	if (section_is_overlay (sect) && cache_ovly_table[i][OSIZE] != 0) {
 	  asection *bsect = sect->the_bfd_section;
-
-	  for (i = 0; i < cache_novlys; i++) {
-	    #pragma GCC diagnostic push
-	    #pragma GCC diagnostic ignored "-Wformat-nonliteral"
-	    sprintf(sectName, cache_ovly_name, i);
-	    #pragma GCC diagnostic pop
-	    if(strcmp(sectName, bsect->name) == 0) {
-	      if (sect->ovly_mapped != cache_ovly_table[i][MAPPED]) {
-		gdb_printf(_("Overlays: section with name %s applying mapping %d\n"), sectName, cache_ovly_table[i][MAPPED]);
-	      }
-	      sect->ovly_mapped = cache_ovly_table[i][MAPPED];
-	      // a horrific hack which should never be allowed.
-	      sect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
-	      break;
+	
+	  #pragma GCC diagnostic push
+	  #pragma GCC diagnostic ignored "-Wformat-nonliteral"
+	  sprintf(sectName, cache_ovly_name, i);
+	  #pragma GCC diagnostic pop
+	  
+	  if(strcmp(sectName, bsect->name) == 0) {
+	    if (sect->ovly_mapped != cache_ovly_table[i][MAPPED]) {
+	      gdb_printf(_("Overlays: section with name %s applying mapping %d, flags=%d\n"), sectName, cache_ovly_table[i][MAPPED], bsect->flags);
 	    }
+	    sect->ovly_mapped = cache_ovly_table[i][MAPPED];
+	    // a horrific hack which should never be allowed.
+	    sect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
+	    break;
 	  }
 	}
+      }
     }
   }
 }

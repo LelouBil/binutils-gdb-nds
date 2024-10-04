@@ -1,2 +1,2 @@
-set output-radix 16
-break error
+# Stub gdbinit for sim/$arch/ subdirs to load the common sim/.gdbinit.
+source ../.gdbinit
