@@ -60,6 +60,7 @@
 #include <ctype.h>
 #include <chrono>
 #include <algorithm>
+#include <fstream>
 
 int (*deprecated_ui_load_progress_hook) (const char *section,
 					 unsigned long num);
@@ -3372,6 +3373,33 @@ overlay_load_command (const char *args, int from_tty)
     error (_("This target does not know how to read its overlay state."));
 }
 
+static void
+overlay_section_map_command (const char *args, int from_tty)
+{
+  struct gdbarch *gdbarch = get_current_arch ();
+
+  if (args == NULL || strlen(args) == 0) {
+    error(_("The `overlay section-map` command requires a file path as input."));
+  }
+
+  if (gdbarch_overlay_mapping_p (gdbarch))
+  {
+    // read the filename from args
+    std::ifstream mapfile(args);
+    std::string line;
+    if (mapfile.is_open()) {
+      while (std::getline(mapfile, line)) {
+        gdbarch_overlay_mapping(gdbarch, line);
+      }
+      mapfile.close();
+    } else {
+      error(_("Unable to open overlay mapping file %s."), args);
+    }
+  }
+  else
+    error (_("This target does not know how to read its overlay state."));
+}
+
 /* Command list chain containing all defined "overlay" subcommands.  */
 static struct cmd_list_element *overlaylist;
 
@@ -3931,6 +3959,9 @@ on its own."), &cmdlist);
 	   _("Enable automatic overlay debugging."), &overlaylist);
   add_cmd ("load-target", class_support, overlay_load_command,
 	   _("Read the overlay mapping state from the target."), &overlaylist);
+
+  add_cmd ("section-map", class_support, overlay_section_map_command,
+	   _("Read the overlay ID map from an external file."), &overlaylist);
 
   /* Filename extension to source language lookup table: */
   add_setshow_string_noescape_cmd ("extension-language", class_files,

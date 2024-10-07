@@ -33,6 +33,8 @@
 #include "elf-none-tdep.h"
 #endif
 
+#include <map>
+
 /* Core file and register set support.  */
 #define ARM_NONE_SIZEOF_GREGSET (18 * ARM_INT_REGISTER_SIZE)
 
@@ -192,18 +194,21 @@ arm_none_iterate_over_regset_sections (struct gdbarch *gdbarch,
 }
 
 // custom overlay updater for NDS
+static void nds_overlay_mapping(std::string line);
 static void nds_overlay_update(struct obj_section *osect);
 static int simple_overlay_update_1 (struct obj_section *osect);
 static int simple_read_overlay_table (void);
 /* Cached, dynamically allocated copies of the target data structures: */
 static unsigned (*cache_ovly_table)[4] = 0;
 static unsigned cache_novlys = 0;
-static char cache_ovly_name[16] = {0};
 static CORE_ADDR cache_ovly_table_base = 0;
 enum ovly_index
   {
-    VMA, OSIZE, LMA, MAPPED
+    VMA, OSIZE, FS_OVERLAY_ID, MAPPED
   };
+
+static std::map<int, obj_section *> ovly_id_map;
+static std::map<std::string, obj_section *> ovly_source_map;
 
 static void
 simple_free_overlay_table (void)
@@ -231,53 +236,27 @@ static int
 simple_overlay_update_1 (struct obj_section *osect)
 {
   int i;
-  asection *bsect = osect->the_bfd_section;
   struct gdbarch *gdbarch = osect->objfile->arch ();
   int word_size = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  char sectName[sizeof(cache_ovly_name)];
 
   for (i = 0; i < cache_novlys; i++) {
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wformat-nonliteral"
-    sprintf(sectName, cache_ovly_name, i);
-    #pragma GCC diagnostic pop
-    if(cache_ovly_table[i][MAPPED] != 0 && strcmp(sectName, bsect->name) == 0) {
+    int fs_id = cache_ovly_table[i][FS_OVERLAY_ID];
+    if(cache_ovly_table[i][MAPPED] != 0 && ovly_id_map[fs_id] == osect) {
       read_target_long_array (cache_ovly_table_base + i * word_size,
 				(unsigned int *) cache_ovly_table[i],
 				4, word_size, byte_order);
-      if(cache_ovly_table[i][MAPPED] != 0 && strcmp(sectName, bsect->name) == 0) {
-	osect->ovly_mapped = cache_ovly_table[i][MAPPED];
-	// a horrific hack which should never be allowed.
-	osect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
-	return 1;
+      if(cache_ovly_table[i][MAPPED] != 0 && ovly_id_map[fs_id] == osect) {
+        osect->ovly_mapped = cache_ovly_table[i][MAPPED];
+        // a horrific hack which should never be allowed.
+        osect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
+        return 1;
       } else { /* Warning!  Warning!  Target's ovly table has changed!  */
-	return 0;
+        return 0;
       }
     }
   }
   return 0;
-}
-
-// http://stanshebs.github.io/gdb-doxy-test/gdb-xref/corefile_8c_source.html
-static void read_memory_string(CORE_ADDR memaddr, char *buffer, int max_len) {
-  char *cp;
-  int i;
-  int cnt;
-
-  cp = buffer;
-  while (true) {
-    if (cp - buffer >= max_len) {
-      buffer[max_len - 1] = '\0';
-      break;
-    }
-
-    cnt = max_len - (cp - buffer);
-    if (cnt > 8) cnt = 8;
-    read_memory(memaddr + (int) (cp - buffer), (gdb_byte *) cp, cnt);
-    for (i = 0; i < cnt && *cp; i++, cp++);
-    if (i < cnt && !*cp) break;
-  }
 }
 
 static int
@@ -298,16 +277,6 @@ simple_read_overlay_table (void)
       return 0;
     }
 
-  bound_minimal_symbol ovly_name_msym
-    = lookup_minimal_symbol (current_program_space, "_ovly_name");
-  if (! ovly_name_msym.minsym)
-    {
-      error (_("Error reading inferior's overlay table: "
-	     "couldn't find `_ovly_name' variable\n"
-	     "in inferior.  Use `overlay manual' mode."));
-      return 0;
-    }
-
   bound_minimal_symbol ovly_table_msym
     = lookup_minimal_symbol (current_program_space, "_ovly_table");
   if (! ovly_table_msym.minsym)
@@ -324,7 +293,6 @@ simple_read_overlay_table (void)
 
   cache_novlys = read_memory_integer (novlys_msym.value_address (),
 				      4, byte_order);
-  read_memory_string (ovly_name_msym.value_address(), cache_ovly_name, sizeof(cache_ovly_name));
 
   cache_ovly_table
     = (unsigned int (*)[4]) xmalloc (cache_novlys * sizeof (*cache_ovly_table));
@@ -338,7 +306,6 @@ simple_read_overlay_table (void)
 
 static void nds_overlay_update(struct obj_section *osect)
 {
-  char sectName[sizeof(cache_ovly_name)];
   /* Were we given an osect to look up?  NULL means do all of them.  */
   if (osect)
     /* Have we got a cached copy of the target's overlay table?  */
@@ -376,29 +343,67 @@ static void nds_overlay_update(struct obj_section *osect)
   // therefore, we find the FIRST matching section, then break, and skip the remaining sections for that ovly.
   int i;
   for (i = 0; i < cache_novlys; i++) {
+    int fs_id = cache_ovly_table[i][FS_OVERLAY_ID];
     for (objfile *objfile : current_program_space->objfiles ()) {
       for (obj_section *sect : objfile->sections ()) {
-	if (section_is_overlay (sect) && cache_ovly_table[i][OSIZE] != 0) {
-	  asection *bsect = sect->the_bfd_section;
-	
-	  #pragma GCC diagnostic push
-	  #pragma GCC diagnostic ignored "-Wformat-nonliteral"
-	  sprintf(sectName, cache_ovly_name, i);
-	  #pragma GCC diagnostic pop
-	  
-	  if(strcmp(sectName, bsect->name) == 0) {
-	    if (sect->ovly_mapped != cache_ovly_table[i][MAPPED]) {
-	      gdb_printf(_("Overlays: section with name %s applying mapping %d, flags=%d\n"), sectName, cache_ovly_table[i][MAPPED], bsect->flags);
-	    }
-	    sect->ovly_mapped = cache_ovly_table[i][MAPPED];
-	    // a horrific hack which should never be allowed.
-	    sect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
-	    break;
-	  }
-	}
+        if (section_is_overlay (sect) && cache_ovly_table[i][OSIZE] != 0) {
+          asection *bsect = sect->the_bfd_section;
+          
+          if(ovly_id_map[fs_id] == sect) {
+            sect->ovly_mapped = cache_ovly_table[i][MAPPED];
+            // a horrific hack which should never be allowed.
+            sect->the_bfd_section->size = cache_ovly_table[i][OSIZE];
+            break;
+          }
+        }
       }
     }
   }
+}
+
+// this is SUPER flaky
+static void nds_overlay_mapping(std::string line)
+{
+  if (line.rfind("OVERLAY ", 0) == 0)
+  {
+    std::string sub = line.substr(8);
+    int index = sub.find(":");
+
+    std::string section_name = sub.substr(0, index);
+    int ovly_id = std::stoi(sub.substr(index + 1));
+
+    for (objfile *objfile : current_program_space->objfiles ()) {
+      for (obj_section *sect : objfile->sections ()) {
+        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+          ovly_id_map[ovly_id] = sect;
+        }
+      }
+    }
+  }
+  else if (line.rfind("SOURCE ", 0) == 0)
+  {
+    std::string sub = line.substr (7);
+    int index = sub.find(":");
+
+    std::string source_name = sub.substr(0, index);
+    std::string section_name = sub.substr(index + 1);
+
+    for (objfile *objfile : current_program_space->objfiles ()) {
+      for (obj_section *sect : objfile->sections ()) {
+        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+          ovly_source_map[source_name] = sect;
+        }
+      }
+    }
+  }
+}
+
+static obj_section *
+nds_overlay_source_section(const char * source)
+{
+  std::map<std::string, obj_section *>::iterator search = ovly_source_map.find(std::string(source));
+  if (search == ovly_source_map.end()) return NULL;
+  return search->second;
 }
 
 /* Initialize ARM bare-metal ABI info.  */
@@ -417,6 +422,8 @@ arm_none_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   /* Support custom overlay manager.  */
   set_gdbarch_overlay_update (gdbarch, nds_overlay_update);
+  set_gdbarch_overlay_mapping (gdbarch, nds_overlay_mapping);
+  set_gdbarch_overlay_source_section (gdbarch, nds_overlay_source_section);
 }
 
 /* Initialize ARM bare-metal target support.  */

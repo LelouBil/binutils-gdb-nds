@@ -9433,7 +9433,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
 	  if (sym != NULL)
 	    sal->section
 	      = sym->obj_section (sal->symtab->compunit ()->objfile ());
-	  else
+    else
 	    {
 	      /* It really is worthwhile to have the section, so we'll
 		 just have to look harder. This case can be executed
@@ -9448,6 +9448,12 @@ resolve_sal_pc (struct symtab_and_line *sal)
 		sal->section = msym.obj_section ();
 	    }
 	}
+      // force override section for overlay mapping-supported architectures
+      obj_section *overlayed = gdbarch_overlay_source_section(get_current_arch(), lbasename(sal->symtab->filename));
+      if (overlayed != NULL)
+      {
+        sal->section = overlayed;
+      }
     }
 }
 

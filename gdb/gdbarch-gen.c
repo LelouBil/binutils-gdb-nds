@@ -199,6 +199,8 @@ struct gdbarch
   ULONGEST displaced_step_buffer_length = 0;
   gdbarch_relocate_instruction_ftype *relocate_instruction = NULL;
   gdbarch_overlay_update_ftype *overlay_update = nullptr;
+  gdbarch_overlay_mapping_ftype *overlay_mapping = nullptr;
+  gdbarch_overlay_source_section_ftype *overlay_source_section = nullptr;
   gdbarch_core_read_description_ftype *core_read_description = nullptr;
   int sofun_address_maybe_missing = 0;
   gdbarch_process_record_ftype *process_record = nullptr;
@@ -4333,6 +4335,54 @@ set_gdbarch_overlay_update (struct gdbarch *gdbarch,
 			    gdbarch_overlay_update_ftype overlay_update)
 {
   gdbarch->overlay_update = overlay_update;
+}
+
+bool
+gdbarch_overlay_mapping_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->overlay_mapping != NULL;
+}
+
+void
+gdbarch_overlay_mapping (struct gdbarch *gdbarch, std::string line)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->overlay_mapping != NULL);
+  if (gdbarch_debug >= 2)
+    gdb_printf (gdb_stdlog, "gdbarch_overlay_mapping called\n");
+  gdbarch->overlay_mapping (line);
+}
+
+void
+set_gdbarch_overlay_mapping (struct gdbarch *gdbarch,
+			    gdbarch_overlay_mapping_ftype overlay_mapping)
+{
+  gdbarch->overlay_mapping = overlay_mapping;
+}
+
+bool
+gdbarch_overlay_source_section_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->overlay_source_section != NULL;
+}
+
+obj_section *
+gdbarch_overlay_source_section (struct gdbarch *gdbarch, const char *source)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->overlay_source_section != NULL);
+  if (gdbarch_debug >= 2)
+    gdb_printf (gdb_stdlog, "gdbarch_overlay_source_section called\n");
+  return gdbarch->overlay_source_section (source);
+}
+
+void
+set_gdbarch_overlay_source_section (struct gdbarch *gdbarch,
+			    gdbarch_overlay_source_section_ftype overlay_source_section)
+{
+  gdbarch->overlay_source_section = overlay_source_section;
 }
 
 bool
