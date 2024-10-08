@@ -2934,6 +2934,13 @@ find_pc_sect_compunit_symtab (CORE_ADDR pc, struct obj_section *section)
     {
       for (compunit_symtab *cust : obj_file->compunits ())
 	{
+    // yet another frustrating hack for overlays!
+    // identify the compunit_symtab which is mapped to section.
+    if (gdbarch_overlay_source_section_p(get_current_arch()) 
+        && gdbarch_overlay_source_section(get_current_arch(), cust->name) != section) {
+      continue;
+    }
+
 	  const struct blockvector *bv = cust->blockvector ();
 	  const struct block *global_block = bv->global_block ();
 	  CORE_ADDR start = global_block->start ();
@@ -2965,8 +2972,10 @@ find_pc_sect_compunit_symtab (CORE_ADDR pc, struct obj_section *section)
 	  struct compunit_symtab *result
 	    = obj_file->find_pc_sect_compunit_symtab (msymbol, pc,
 						      section, 0);
-	  if (result != nullptr)
+	  if (result != nullptr) {
+      gdb_printf(_("I am running find_pc_sect, my compunit is %s and I found %s\n"), cust->name, result->name);
 	    return result;
+    }
 
 	  if (section != 0)
 	    {

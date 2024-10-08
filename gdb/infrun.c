@@ -9304,7 +9304,7 @@ print_stop_location (const target_waitstatus &ws)
 	  && (tp->control.step_start_function
 	      == find_pc_function (tp->stop_pc ())))
 	{
-	  symtab_and_line sal = find_frame_sal (get_selected_frame (nullptr));
+	  symtab_and_line sal = find_frame_sal_overlay (get_selected_frame (nullptr), tp->control.stop_bpstat->bp_location_at->section);
 	  if (sal.symtab != tp->current_symtab)
 	    {
 	      /* Finished step in same frame but into different file, print
@@ -9620,7 +9620,9 @@ normal_stop ()
       select_frame (get_current_frame ());
 
       /* Set the current source location.  */
-      set_current_sal_from_frame (get_current_frame ());
+      set_current_sal_from_frame_overlay (get_current_frame (), (inferior_ptid != null_ptid
+		       ? inferior_thread ()->control.stop_bpstat
+		       : nullptr));
     }
 
   /* Look up the hook_stop and run it (CLI internally handles problem

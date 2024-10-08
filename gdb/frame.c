@@ -2906,6 +2906,23 @@ find_frame_sal (const frame_info_ptr &frame)
   return find_pc_line (pc, notcurrent);
 }
 
+symtab_and_line
+find_frame_sal_overlay (const frame_info_ptr &frame, struct obj_section * sect)
+{
+  if (sect == NULL) return find_frame_sal(frame);
+  
+  int notcurrent;
+  CORE_ADDR pc;
+
+  if (!get_frame_pc_if_available (frame, &pc))
+    return {};
+
+  notcurrent = (pc != get_frame_address_in_block (frame));
+  symtab_and_line overlayed = find_pc_sect_line(pc, sect, notcurrent);
+
+  return overlayed;
+}
+
 /* Per "frame.h", return the ``address'' of the frame.  Code should
    really be using get_frame_id().  */
 CORE_ADDR

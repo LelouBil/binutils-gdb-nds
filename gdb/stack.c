@@ -921,6 +921,22 @@ set_current_sal_from_frame (const frame_info_ptr &frame)
     set_current_source_symtab_and_line (sal);
 }
 
+void
+set_current_sal_from_frame_overlay (const frame_info_ptr &frame, bpstat *bs)
+{
+  if (bs != NULL && bs->bp_location_at != NULL && bs->bp_location_at->section != NULL && bs->bp_location_at->section->the_bfd_section != NULL)
+    gdb_printf(_("Identify SAL from frame with section %s\n"), bs->bp_location_at->section->the_bfd_section->name);
+  
+  symtab_and_line sal = find_frame_sal (frame);
+
+  if (bs != NULL && bs->bp_location_at != NULL && bs->bp_location_at->section != NULL && gdbarch_overlay_mapping_p(get_current_arch())) 
+    sal = find_frame_sal_overlay(frame, bs->bp_location_at->section);
+
+  if (sal.symtab != NULL) {
+    set_current_source_symtab_and_line (sal);
+  }
+}
+
 /* If ON, GDB will display disassembly of the next source line when
    execution of the program being debugged stops.
    If AUTO (which is the default), or there's no line info to determine

@@ -82,6 +82,10 @@ struct gdbarch;
 struct ui_file;
 struct ui_out;
 struct frame_print_options;
+struct bpstat;
+struct obj_section;
+
+extern struct gdbarch *get_current_arch (void);
 
 /* The frame object.  */
 
@@ -565,11 +569,13 @@ extern bool get_frame_func_if_available (const frame_info_ptr &fi, CORE_ADDR *);
    carefully considered to determine if the real intent was for it to
    apply to the PC or the adjusted PC.  */
 extern symtab_and_line find_frame_sal (const frame_info_ptr &frame);
+extern symtab_and_line find_frame_sal_overlay (const frame_info_ptr &frame, struct obj_section *section);
 
 /* Set the current source and line to the location given by frame
    FRAME, if possible.  */
 
 void set_current_sal_from_frame (const frame_info_ptr &);
+void set_current_sal_from_frame_overlay (const frame_info_ptr &, bpstat *);
 
 /* Return the frame base (what ever that is) (DEPRECATED).
 

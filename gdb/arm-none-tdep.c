@@ -347,8 +347,6 @@ static void nds_overlay_update(struct obj_section *osect)
     for (objfile *objfile : current_program_space->objfiles ()) {
       for (obj_section *sect : objfile->sections ()) {
         if (section_is_overlay (sect) && cache_ovly_table[i][OSIZE] != 0) {
-          asection *bsect = sect->the_bfd_section;
-          
           if(ovly_id_map[fs_id] == sect) {
             sect->ovly_mapped = cache_ovly_table[i][MAPPED];
             // a horrific hack which should never be allowed.
