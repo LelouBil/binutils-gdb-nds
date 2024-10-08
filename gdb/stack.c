@@ -370,6 +370,29 @@ print_stack_frame (const frame_info_ptr &frame, int print_level,
     }
 }
 
+void
+print_stack_frame (const frame_info_ptr &frame, int print_level,
+		   enum print_what print_what,
+		   int set_current_sal, bpstat *bs)
+{
+
+  /* For mi, always print location and address.  */
+  if (current_uiout->is_mi_like_p ())
+    print_what = LOC_AND_ADDRESS;
+
+  try
+    {
+      print_frame_info (user_frame_print_options,
+			frame, print_level, print_what, 1 /* print_args */,
+			set_current_sal, bs);
+      if (set_current_sal)
+	set_current_sal_from_frame_overlay (frame, bs);
+    }
+  catch (const gdb_exception_error &e)
+    {
+    }
+}
+
 /* Print nameless arguments of frame FRAME on STREAM, where START is
    the offset of the first nameless argument, and NUM is the number of
    nameless arguments to print.  FIRST is nonzero if this is the first
@@ -1030,10 +1053,10 @@ get_user_print_what_frame_info (std::optional<enum print_what> *what)
    messages.  */
 
 static void
-do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
+do_print_frame_info_overlay (struct ui_out *uiout, const frame_print_options &fp_opts,
 		     const frame_info_ptr &frame, int print_level,
 		     enum print_what print_what, int print_args,
-		     int set_current_sal)
+		     int set_current_sal, bpstat *bs)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   int source_print;
@@ -1106,7 +1129,9 @@ do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
      the next frame is a SIGTRAMP_FRAME or a DUMMY_FRAME, then the
      next frame was not entered as the result of a call, and we want
      to get the line containing FRAME->pc.  */
-  symtab_and_line sal = find_frame_sal (frame);
+  symtab_and_line sal;
+  if (bs == NULL) sal = find_frame_sal (frame);
+  else sal = find_frame_sal_overlay (frame, bs->bp_location_at->section);
 
   location_print = (print_what == LOCATION
 		    || print_what == SRC_AND_LOC
@@ -1194,6 +1219,15 @@ do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
   gdb_flush (gdb_stdout);
 }
 
+static void
+do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
+		     const frame_info_ptr &frame, int print_level,
+		     enum print_what print_what, int print_args,
+		     int set_current_sal)
+{
+  do_print_frame_info_overlay(uiout, fp_opts, frame, print_level, print_what, print_args, set_current_sal, NULL);
+}
+
 /* Redirect output to a temporary buffer for the duration
    of do_print_frame_info.  */
 
@@ -1206,6 +1240,17 @@ print_frame_info (const frame_print_options &fp_opts,
   do_with_buffered_output (do_print_frame_info, current_uiout,
 			   fp_opts, frame, print_level, print_what,
 			   print_args, set_current_sal);
+}
+
+void
+print_frame_info (const frame_print_options &fp_opts,
+		  const frame_info_ptr &frame, int print_level,
+		  enum print_what print_what, int print_args,
+		  int set_current_sal, bpstat *bs)
+{
+  do_with_buffered_output (do_print_frame_info_overlay, current_uiout,
+			   fp_opts, frame, print_level, print_what,
+			   print_args, set_current_sal, bs);
 }
 
 /* See stack.h.  */

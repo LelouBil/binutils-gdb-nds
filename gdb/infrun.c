@@ -9347,7 +9347,7 @@ print_stop_location (const target_waitstatus &ws)
      LOCATION: Print only location
      SRC_AND_LOC: Print location and source line.  */
   if (do_frame_printing)
-    print_stack_frame (get_selected_frame (nullptr), 0, source_flag, 1);
+    print_stack_frame (get_selected_frame (nullptr), 0, source_flag, 1, tp->control.stop_bpstat);
 }
 
 /* See `print_stop_event` in infrun.h.  */
