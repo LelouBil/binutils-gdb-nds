@@ -2972,10 +2972,8 @@ find_pc_sect_compunit_symtab (CORE_ADDR pc, struct obj_section *section)
 	  struct compunit_symtab *result
 	    = obj_file->find_pc_sect_compunit_symtab (msymbol, pc,
 						      section, 0);
-	  if (result != nullptr) {
-      gdb_printf(_("I am running find_pc_sect, my compunit is %s and I found %s\n"), cust->name, result->name);
+	  if (result != nullptr)
 	    return result;
-    }
 
 	  if (section != 0)
 	    {

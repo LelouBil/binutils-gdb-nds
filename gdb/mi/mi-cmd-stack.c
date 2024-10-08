@@ -103,6 +103,8 @@ mi_cmd_stack_list_frames (const char *command, const char *const *argv,
       { 0, 0, 0 }
     };
 
+    struct thread_info *tp = inferior_thread ();
+
   /* Parse arguments.  In this instance we are just looking for
      --no-frame-filters.  */
   while (1)
@@ -180,8 +182,14 @@ mi_cmd_stack_list_frames (const char *command, const char *const *argv,
 	  QUIT;
 	  /* Print the location and the address always, even for level 0.
 	     If args is 0, don't print the arguments.  */
-	  print_frame_info (user_frame_print_options,
+    // this is some GARBAGE for overlay handling
+    if (tp->control.stop_bpstat != NULL) {
+      print_frame_info (user_frame_print_options,
+			    fi, 1, LOC_AND_ADDRESS, 0 /* args */, 0, tp->control.stop_bpstat);
+    } else {
+      print_frame_info (user_frame_print_options,
 			    fi, 1, LOC_AND_ADDRESS, 0 /* args */, 0);
+    }
 	}
     }
 }

@@ -947,9 +947,6 @@ set_current_sal_from_frame (const frame_info_ptr &frame)
 void
 set_current_sal_from_frame_overlay (const frame_info_ptr &frame, bpstat *bs)
 {
-  if (bs != NULL && bs->bp_location_at != NULL && bs->bp_location_at->section != NULL && bs->bp_location_at->section->the_bfd_section != NULL)
-    gdb_printf(_("Identify SAL from frame with section %s\n"), bs->bp_location_at->section->the_bfd_section->name);
-  
   symtab_and_line sal = find_frame_sal (frame);
 
   if (bs != NULL && bs->bp_location_at != NULL && bs->bp_location_at->section != NULL && gdbarch_overlay_mapping_p(get_current_arch())) 
