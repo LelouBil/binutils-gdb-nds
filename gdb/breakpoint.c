@@ -12000,6 +12000,8 @@ code_breakpoint::breakpoint_hit (const struct bp_location *bl,
 				 CORE_ADDR bp_addr,
 				 const target_waitstatus &ws)
 {
+  struct gdbarch *gdbarch;
+
   if (ws.kind () != TARGET_WAITKIND_STOPPED
       || ws.sig () != GDB_SIGNAL_TRAP)
     return 0;
@@ -12012,6 +12014,16 @@ code_breakpoint::breakpoint_hit (const struct bp_location *bl,
       && section_is_overlay (bl->section)
       && !section_is_mapped (bl->section))
     return 0;
+
+  // hack: force NDS overlays to be reloaded here. isn't this supposed to happen by default?
+  if (overlay_debugging == ovly_auto && this->type == bp_overlay_event)
+  {
+    gdbarch = get_current_arch();
+    if (gdbarch_overlay_update_p(gdbarch))
+    {
+      gdbarch_overlay_update(gdbarch, NULL);
+    }
+  }
 
   return 1;
 }
