@@ -1217,6 +1217,22 @@ typedef void (gdbarch_overlay_update_ftype) (struct obj_section *osect);
 extern void gdbarch_overlay_update (struct gdbarch *gdbarch, struct obj_section *osect);
 extern void set_gdbarch_overlay_update (struct gdbarch *gdbarch, gdbarch_overlay_update_ftype *overlay_update);
 
+/* Load an overlay mapping from an input file. */
+
+extern bool gdbarch_overlay_mapping_p (struct gdbarch *gdbarch);
+
+typedef void (gdbarch_overlay_mapping_ftype) (char *mapfile);
+extern void gdbarch_overlay_mapping (struct gdbarch *gdbarch, char *mapfile);
+extern void set_gdbarch_overlay_mapping (struct gdbarch *gdbarch, gdbarch_overlay_mapping_ftype *overlay_mapping);
+
+/* Requests details on the mapping from a file to an overlay section. */
+
+extern bool gdbarch_overlay_source_p (struct gdbarch *gdbarch);
+
+typedef struct obj_section * (gdbarch_overlay_source_ftype) (const char *filename);
+extern struct obj_section * gdbarch_overlay_source (struct gdbarch *gdbarch, const char *filename);
+extern void set_gdbarch_overlay_source (struct gdbarch *gdbarch, gdbarch_overlay_source_ftype *overlay_source);
+
 extern bool gdbarch_core_read_description_p (struct gdbarch *gdbarch);
 
 typedef const struct target_desc * (gdbarch_core_read_description_ftype) (struct gdbarch *gdbarch, struct target_ops *target, bfd *abfd);

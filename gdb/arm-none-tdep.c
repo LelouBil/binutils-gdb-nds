@@ -25,6 +25,14 @@
 #include "regset.h"
 #include "user-regs.h"
 
+#include "symfile.h"
+#include "progspace.h"
+#include "objfiles.h"
+#include "gdbcore.h"
+
+#include <map>
+#include <fstream>
+
 #ifdef HAVE_ELF
 #include "elf-none-tdep.h"
 #endif
@@ -187,6 +195,169 @@ arm_none_iterate_over_regset_sections (struct gdbarch *gdbarch,
 	&arm_none_vfpregset, "VFP floating-point", cb_data);
 }
 
+static void nds_overlay_update(struct obj_section *osect);
+static void nds_overlay_mapping(char * filename);
+static int simple_read_overlay_table (void);
+
+static unsigned (*cache_ovly_table)[4] = 0;
+static unsigned cache_novlys = 0;
+static CORE_ADDR cache_ovly_table_base = 0;
+enum ovly_index
+  {
+    VMA, OSIZE, FS_OVERLAY_ID, MAPPED
+  };
+
+static std::map<int, obj_section *> ovly_id_map;
+static std::map<std::string, obj_section *> ovly_source_map;
+
+static void
+simple_free_overlay_table (void)
+{
+  xfree (cache_ovly_table);
+  cache_novlys = 0;
+  cache_ovly_table = NULL;
+  cache_ovly_table_base = 0;
+}
+
+static void read_target_long_array (CORE_ADDR memaddr, unsigned int *myaddr, int len, int size, enum bfd_endian byte_order)
+{
+  /* FIXME (alloca): Not safe if array is very large.  */
+  gdb_byte *buf = (gdb_byte *) alloca (len * size);
+  read_memory (memaddr, buf, len * size);
+  for (int idx = 0; idx < len; idx++)
+  {
+    myaddr[idx] = extract_unsigned_integer (size * idx + buf, size, byte_order);
+  }
+}
+
+static int simple_read_overlay_table (void)
+{
+  struct gdbarch *gdbarch;
+  int word_size;
+  enum bfd_endian byte_order;
+
+  simple_free_overlay_table ();
+  bound_minimal_symbol novlys_msym = lookup_minimal_symbol (current_program_space, "_novlys");
+  if (!novlys_msym.minsym)
+  {
+    error (_("Error reading inferior's overlay table: "
+      "couldn't find `_novlys' variable\n"
+      "in inferior.  Use `overlay manual' mode."));
+    return 0;
+  }
+
+  bound_minimal_symbol ovly_table_msym = lookup_minimal_symbol (current_program_space, "_ovly_table");
+  if (!ovly_table_msym.minsym)
+  {
+    error (_("Error reading inferior's overlay table: couldn't find "
+      "`_ovly_table' array\n"
+      "in inferior.  Use `overlay manual' mode."));
+    return 0;
+  }
+
+  gdbarch = ovly_table_msym.objfile->arch ();
+  word_size = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
+  byte_order = gdbarch_byte_order (gdbarch);
+
+  cache_novlys = read_memory_integer (novlys_msym.value_address (), 4, byte_order);
+
+  cache_ovly_table = (unsigned int (*)[4]) xmalloc (cache_novlys * sizeof (*cache_ovly_table));
+  cache_ovly_table_base = ovly_table_msym.value_address ();
+  read_target_long_array (cache_ovly_table_base,
+			  (unsigned int *) cache_ovly_table,
+			  cache_novlys * 4, word_size, byte_order);
+
+  return 1;			/* SUCCESS */
+}
+
+static void nds_overlay_update(struct obj_section *osect)
+{
+  // to simplify, overlay table is not cached. this might bite us in the future.
+  if (! simple_read_overlay_table ())
+    return;
+
+  // this iterates over cache_novlys in the outer loop and obj_section in the inner loop.
+  // this is reversed from simple_overlay_update. why? because pokeplat (and presumably other NDS games)
+  // generate multiple debug sections for each overlay (one points at start addr, one points at end)
+  // because of this, there will be 2 sections matching any loaded overlay, but we only want to load the first.
+  // therefore, we find the FIRST matching section, then break, and skip the remaining sections for that ovly.
+  for (int idx = 0; idx < cache_novlys; idx++) 
+  {
+    int fs_id = cache_ovly_table[idx][FS_OVERLAY_ID];
+    for (objfile *objfile : current_program_space->objfiles ()) 
+    {
+      for (obj_section *sect : objfile->sections ()) 
+      {
+        if (section_is_overlay (sect) && cache_ovly_table[idx][OSIZE] != 0 && ovly_id_map[fs_id] == sect) 
+        {
+          sect->ovly_mapped = cache_ovly_table[idx][MAPPED];
+          // a horrific hack which should never be allowed. unfortunately it's required!
+          sect->the_bfd_section->size = cache_ovly_table[idx][OSIZE];
+          sect->set_offset(0);
+          break;
+        }
+      }
+    }
+  }
+}
+
+// this is SUPER flaky but should work fine with well-formed inputs
+static void nds_overlay_mapping(char * filename)
+{
+  std::string line;
+  std::ifstream mapfile(filename);
+  if (mapfile.is_open()) {
+    while (std::getline(mapfile, line)) {
+      if (line.rfind("OVERLAY ", 0) == 0)
+      {
+        std::string sub = line.substr(8);
+        int index = sub.find(":");
+
+        std::string section_name = sub.substr(0, index);
+        int ovly_id = std::stoi(sub.substr(index + 1));
+
+        for (objfile *objfile : current_program_space->objfiles ()) {
+          for (obj_section *sect : objfile->sections ()) {
+            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+              ovly_id_map[ovly_id] = sect;
+              break;
+            }
+          }
+        }
+      }
+      else if (line.rfind("SOURCE ", 0) == 0)
+      {
+        std::string sub = line.substr (7);
+        int index = sub.find(":");
+
+        std::string source_name = sub.substr(0, index);
+        std::string section_name = sub.substr(index + 1);
+
+        for (objfile *objfile : current_program_space->objfiles ()) {
+          for (obj_section *sect : objfile->sections ()) {
+            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+              ovly_source_map[source_name] = sect;
+              break;
+            }
+          }
+        }
+      }
+    }
+    mapfile.close();
+  }
+
+  breakpoint_re_set ();
+  insert_breakpoints ();
+}
+
+static obj_section *
+nds_overlay_source(const char * source)
+{
+  std::map<std::string, obj_section *>::iterator search = ovly_source_map.find(std::string(source));
+  if (search == ovly_source_map.end()) return NULL;
+  return search->second;
+}
+
 /* Initialize ARM bare-metal ABI info.  */
 
 static void
@@ -200,6 +371,13 @@ arm_none_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
      files.  */
   set_gdbarch_iterate_over_regset_sections
     (gdbarch, arm_none_iterate_over_regset_sections);
+
+  /* Support custom overlay manager.  */
+  set_gdbarch_overlay_update (gdbarch, nds_overlay_update);
+  set_gdbarch_overlay_mapping (gdbarch, nds_overlay_mapping);
+  set_gdbarch_overlay_source (gdbarch, nds_overlay_source);
+  // if cached_map_file is set, try to initialize map
+  refresh_cached_overlay_map(gdbarch);
 }
 
 /* Initialize ARM bare-metal target support.  */

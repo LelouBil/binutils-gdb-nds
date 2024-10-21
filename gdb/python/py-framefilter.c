@@ -798,7 +798,7 @@ py_print_frame (PyObject *filter, frame_filter_flags flags,
   if (frame == NULL)
     return EXT_LANG_BT_ERROR;
 
-  symtab_and_line sal = find_frame_sal (frame);
+  symtab_and_line sal = find_frame_sal (frame, nullptr);
 
   gdbarch = get_frame_arch (frame);
 

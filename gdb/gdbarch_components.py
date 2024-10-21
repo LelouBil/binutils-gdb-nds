@@ -1985,6 +1985,26 @@ Refresh overlay mapped state for section OSECT.
     predicate=True,
 )
 
+Function(
+    comment="""
+Load an overlay mapping from an input file.
+""",
+    type="void",
+    name="overlay_mapping",
+    params=[("char *", "mapfile")],
+    predicate=True,
+)
+
+Function(
+    comment="""
+Requests details on the mapping from a file to an overlay section.
+""",
+    type="struct obj_section *",
+    name="overlay_source",
+    params=[("const char *", "filename")],
+    predicate=True,
+)
+
 Method(
     type="const struct target_desc *",
     name="core_read_description",

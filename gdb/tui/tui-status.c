@@ -268,7 +268,8 @@ tui_show_frame_info (const frame_info_ptr &fi)
 
   if (fi != nullptr)
     {
-      symtab_and_line sal = find_frame_sal (fi);
+      // TODO OVERLAY
+      symtab_and_line sal = find_frame_sal (fi, nullptr);
 
       const char *func_name;
       /* find_frame_sal does not always set PC, but we want to ensure

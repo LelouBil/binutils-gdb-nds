@@ -787,7 +787,7 @@ gdbscm_frame_sal (SCM self)
       if (frame != NULL)
 	{
 	  found = true;
-	  sal = find_frame_sal (frame);
+	  sal = find_frame_sal (frame, nullptr);
 	}
     }
   catch (const gdb_exception &except)

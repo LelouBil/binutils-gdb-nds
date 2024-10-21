@@ -338,7 +338,8 @@ print_stack_frame_to_uiout (struct ui_out *uiout, const frame_info_ptr &frame,
 {
   scoped_restore save_uiout = make_scoped_restore (&current_uiout, uiout);
 
-  print_stack_frame (frame, print_level, print_what, set_current_sal);
+  // TODO OVERLAY
+  print_stack_frame (frame, print_level, print_what, set_current_sal, nullptr);
 }
 
 /* Show or print a stack frame FRAME briefly.  The output is formatted
@@ -350,7 +351,7 @@ print_stack_frame_to_uiout (struct ui_out *uiout, const frame_info_ptr &frame,
 void
 print_stack_frame (const frame_info_ptr &frame, int print_level,
 		   enum print_what print_what,
-		   int set_current_sal)
+		   int set_current_sal, obj_section * target_section)
 {
 
   /* For mi, always print location and address.  */
@@ -361,9 +362,9 @@ print_stack_frame (const frame_info_ptr &frame, int print_level,
     {
       print_frame_info (user_frame_print_options,
 			frame, print_level, print_what, 1 /* print_args */,
-			set_current_sal);
+			set_current_sal, target_section);
       if (set_current_sal)
-	set_current_sal_from_frame (frame);
+	      set_current_sal_from_frame (frame, target_section);
     }
   catch (const gdb_exception_error &e)
     {
@@ -914,9 +915,9 @@ print_frame_args (const frame_print_options &fp_opts,
    line is in the center of the next 'list'.  */
 
 void
-set_current_sal_from_frame (const frame_info_ptr &frame)
+set_current_sal_from_frame (const frame_info_ptr &frame, struct obj_section * target_section)
 {
-  symtab_and_line sal = find_frame_sal (frame);
+  symtab_and_line sal = find_frame_sal (frame, target_section);
   if (sal.symtab != NULL)
     set_current_source_symtab_and_line (sal);
 }
@@ -1017,7 +1018,7 @@ static void
 do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
 		     const frame_info_ptr &frame, int print_level,
 		     enum print_what print_what, int print_args,
-		     int set_current_sal)
+		     int set_current_sal, obj_section * target_section)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   int source_print;
@@ -1090,7 +1091,7 @@ do_print_frame_info (struct ui_out *uiout, const frame_print_options &fp_opts,
      the next frame is a SIGTRAMP_FRAME or a DUMMY_FRAME, then the
      next frame was not entered as the result of a call, and we want
      to get the line containing FRAME->pc.  */
-  symtab_and_line sal = find_frame_sal (frame);
+  symtab_and_line sal = find_frame_sal (frame, target_section);
 
   location_print = (print_what == LOCATION
 		    || print_what == SRC_AND_LOC
@@ -1185,11 +1186,11 @@ void
 print_frame_info (const frame_print_options &fp_opts,
 		  const frame_info_ptr &frame, int print_level,
 		  enum print_what print_what, int print_args,
-		  int set_current_sal)
+		  int set_current_sal, obj_section * target_section)
 {
   do_with_buffered_output (do_print_frame_info, current_uiout,
 			   fp_opts, frame, print_level, print_what,
-			   print_args, set_current_sal);
+			   print_args, set_current_sal, target_section);
 }
 
 /* See stack.h.  */
@@ -1505,7 +1506,8 @@ info_frame_command_core (const frame_info_ptr &fi, bool selected_frame_p)
 
   frame_pc_p = get_frame_pc_if_available (fi, &frame_pc);
   func = get_frame_function (fi);
-  symtab_and_line sal = find_frame_sal (fi);
+  obj_section * target_section = find_frame_section(frame_pc);
+  symtab_and_line sal = find_frame_sal (fi, target_section);
   s = sal.symtab;
   gdb::unique_xmalloc_ptr<char> func_only;
   if (func)
@@ -2061,8 +2063,8 @@ backtrace_command_1 (const frame_print_options &fp_opts,
 	     means further attempts to backtrace would fail (on the other
 	     hand, perhaps the code does or could be fixed to make sure
 	     the frame->prev field gets set to NULL in that case).  */
-
-	  print_frame_info (fp_opts, fi, 1, LOCATION, 1, 0);
+    // TODO OVERLAY
+	  print_frame_info (fp_opts, fi, 1, LOCATION, 1, 0, nullptr);
 	  if ((flags & PRINT_LOCALS) != 0)
 	    print_frame_local_vars (fi, false, NULL, NULL, 1, gdb_stdout);
 
@@ -2815,8 +2817,9 @@ return_command (const char *retval_exp, int from_tty)
 
   select_frame (get_current_frame ());
   /* If interactive, print the frame that is now current.  */
+  // TODO OVERLAY
   if (from_tty)
-    print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
+    print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1, nullptr);
 }
 
 /* Find the most inner frame in the current stack for a function called
@@ -2980,8 +2983,9 @@ frame_apply_command_count (const char *which_command,
 				     "unable to get selected frame."));
 	  if (!flags.silent || cmd_result.length () > 0)
 	    {
+        // TODO OVERLAY
 	      if (!flags.quiet)
-		print_stack_frame (fi, 1, LOCATION, 0);
+		print_stack_frame (fi, 1, LOCATION, 0, nullptr);
 	      gdb_printf ("%s", cmd_result.c_str ());
 	    }
 	}
@@ -2991,8 +2995,9 @@ frame_apply_command_count (const char *which_command,
 				     "unable to get selected frame."));
 	  if (!flags.silent)
 	    {
+        // TODO OVERLAY
 	      if (!flags.quiet)
-		print_stack_frame (fi, 1, LOCATION, 0);
+		print_stack_frame (fi, 1, LOCATION, 0, nullptr);
 	      if (flags.cont)
 		gdb_printf ("%s\n", ex.what ());
 	      else

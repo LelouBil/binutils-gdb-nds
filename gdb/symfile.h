@@ -416,4 +416,6 @@ extern int readnever_symbol_files;
 
 extern void symbol_file_command (const char *, int);
 
+extern void refresh_cached_overlay_map(struct gdbarch *gdbarch);
+
 #endif /* !defined(SYMFILE_H) */

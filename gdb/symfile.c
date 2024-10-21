@@ -3372,6 +3372,36 @@ overlay_load_command (const char *args, int from_tty)
     error (_("This target does not know how to read its overlay state."));
 }
 
+static char cached_ovly_map_file[256];
+
+static void
+overlay_map_command (const char *args, int from_tty)
+{
+  struct gdbarch *gdbarch = get_current_arch ();
+
+  if (args == NULL || strlen(args) == 0) {
+    error(_("The `overlay map` command requires a file path as input."));
+  }
+
+  if (gdbarch_overlay_mapping_p (gdbarch))
+  {
+    gdbarch_overlay_mapping(gdbarch, (char *) args);
+  }
+  else
+  {
+    // because VSC sucks, preserve the mapping file name. we will try to reload this once architecture is ready.
+    strcpy(cached_ovly_map_file, args);
+  }
+}
+
+void refresh_cached_overlay_map(struct gdbarch *gdbarch)
+{
+  if (gdbarch_overlay_mapping_p (gdbarch) && strlen(cached_ovly_map_file) != 0)
+  {
+    gdbarch_overlay_mapping(gdbarch, cached_ovly_map_file);
+  }
+}
+
 /* Command list chain containing all defined "overlay" subcommands.  */
 static struct cmd_list_element *overlaylist;
 
@@ -3913,6 +3943,9 @@ on its own."), &cmdlist);
 
   add_com_alias ("ovly", overlay_cmd, class_support, 1);
   add_com_alias ("ov", overlay_cmd, class_support, 1);
+
+  add_cmd ("map", class_support, overlay_map_command,
+	   _("Read the overlay ID map from an external file."), &overlaylist);
 
   add_cmd ("map-overlay", class_support, map_overlay_command,
 	   _("Assert that an overlay section is mapped."), &overlaylist);

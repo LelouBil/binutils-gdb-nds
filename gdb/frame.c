@@ -45,6 +45,7 @@
 #include "valprint.h"
 #include "cli/cli-option.h"
 #include "dwarf2/loc.h"
+#include "arch-utils.h"
 
 /* The sentinel frame terminates the innermost end of the frame chain.
    If unwound, it returns the information needed to construct an
@@ -1853,7 +1854,8 @@ lookup_selected_frame (struct frame_id a_frame_id, int frame_level)
       /* For MI, we should probably have a notification about current
 	 frame change.  But this error is not very likely, so don't
 	 bother for now.  */
-      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
+      // TODO OVERLAY
+      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1, nullptr);
     }
 }
 
@@ -2831,6 +2833,26 @@ get_frame_address_in_block (const frame_info_ptr &this_frame)
   return pc;
 }
 
+// utility method which can identify the target section when we step
+// this works only because we are already stepping, so we know the relevant overlay is loaded.
+// in other areas this is not safe because e.g. a breakpoint may be placed in an unloaded overlay.
+obj_section * find_frame_section(CORE_ADDR pc)
+{
+  gdbarch * gdbarch = get_current_arch();
+  if (gdbarch_overlay_update_p(gdbarch))
+  {
+    for (objfile *objfile : current_program_space->objfiles ())
+    {
+      for (obj_section *sect : objfile->sections ())
+      {
+        if (section_is_overlay(sect) && section_is_mapped(sect) && pc_in_mapped_range(pc, sect))
+          return sect;
+      }
+    }
+  }
+  return nullptr;
+}
+
 bool
 get_frame_address_in_block_if_available (const frame_info_ptr &this_frame,
 					 CORE_ADDR *pc)
@@ -2851,7 +2873,7 @@ get_frame_address_in_block_if_available (const frame_info_ptr &this_frame,
 }
 
 symtab_and_line
-find_frame_sal (const frame_info_ptr &frame)
+find_frame_sal (const frame_info_ptr &frame, struct obj_section * target_section)
 {
   frame_info_ptr next_frame;
   int notcurrent;
@@ -2903,7 +2925,13 @@ find_frame_sal (const frame_info_ptr &frame)
     return {};
 
   notcurrent = (pc != get_frame_address_in_block (frame));
-  return find_pc_line (pc, notcurrent);
+  
+  if (target_section == nullptr)
+  {
+    return find_pc_line(pc, notcurrent);
+  }
+
+  return find_pc_sect_line (pc, target_section, notcurrent);
 }
 
 /* Per "frame.h", return the ``address'' of the frame.  Code should

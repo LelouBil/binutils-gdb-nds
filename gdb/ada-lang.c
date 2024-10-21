@@ -11788,7 +11788,7 @@ is_known_support_routine (const frame_info_ptr &frame)
   /* If this code does not have any debugging information (no symtab),
      This cannot be any user code.  */
 
-  symtab_and_line sal = find_frame_sal (frame);
+  symtab_and_line sal = find_frame_sal (frame, nullptr);
   if (sal.symtab == NULL)
     return 1;
 

@@ -97,6 +97,7 @@
 #include "dwarf2/parent-map.h"
 #include "dwarf2/error.h"
 #include <variant>
+#include "arch-utils.h"
 
 /* When == 1, print basic high level tracing messages.
    When > 1, be more verbose.
@@ -3012,6 +3013,8 @@ recursively_find_pc_sect_compunit_symtab (struct compunit_symtab *cust,
   return NULL;
 }
 
+static unrelocated_addr dwarf2_find_max_address(die_info*, dwarf2_cu*);
+
 struct compunit_symtab *
 dwarf2_base_index_functions::find_pc_sect_compunit_symtab
      (struct objfile *objfile,
@@ -3021,6 +3024,7 @@ dwarf2_base_index_functions::find_pc_sect_compunit_symtab
       int warn_if_readin)
 {
   struct compunit_symtab *result;
+  struct gdbarch *current_arch = get_current_arch();
 
   dwarf2_per_objfile *per_objfile = get_dwarf2_per_objfile (objfile);
   dwarf2_per_bfd *per_bfd = per_objfile->per_bfd;
@@ -3033,6 +3037,47 @@ dwarf2_base_index_functions::find_pc_sect_compunit_symtab
     = per_bfd->index_table->lookup ((unrelocated_addr) (pc - baseaddr));
   if (data == nullptr)
     return nullptr;
+
+  // TODO OVERLAY
+  // check these conditions
+  if (section != nullptr
+      && gdbarch_overlay_source_p(current_arch)
+      && gdbarch_overlay_source(current_arch, data->fnd->get_name()) != NULL
+      && gdbarch_overlay_source(current_arch, data->fnd->get_name()) != section)
+  {
+    // identify which CU matches the input section
+    for(const auto &unit : per_bfd->all_units) 
+    {
+      if (gdbarch_overlay_source(current_arch, unit->fnd->get_name()) == section)
+      {
+        // possible match, need to check if `pc` (or unrelocated `pc`) fall inside this CU specifically.
+        // it's NOT enough to just check `section`, because `pc` may fall into any CU in the section.
+        // (CU = file)
+
+        // load the dwarf2_cu, this may require reading it fresh if it's not already in memory.
+        dwarf2_cu *full_cu = per_objfile->get_cu(unit.get());
+        if (full_cu == NULL) {
+          load_full_comp_unit (unit.get(), per_objfile, nullptr, false, language_minimal);
+        }
+        full_cu = per_objfile->get_cu(unit.get());
+
+        unrelocated_addr max = {};
+
+        if (full_cu != NULL && full_cu->dies != NULL) 
+        {
+          dwarf2_find_base_address (full_cu->dies, full_cu);
+          max = dwarf2_find_max_address (full_cu->dies, full_cu);
+        }
+
+        if (full_cu->base_address.has_value()) {
+          CORE_ADDR target_addr = pc - baseaddr;
+          if (target_addr >= (CORE_ADDR) full_cu->base_address.value() && target_addr <= (CORE_ADDR) max) {
+            data = unit.get();
+          }
+        }
+      }
+    }
+  }
 
   if (warn_if_readin && per_objfile->symtab_set_p (data))
     warning (_("(Internal error: pc %s in read in CU, but not in symtab.)"),
@@ -3293,6 +3338,18 @@ dwarf2_find_base_address (struct die_info *die, struct dwarf2_cu *cu)
       if (attr != nullptr)
 	cu->base_address = attr->as_address ();
     }
+}
+
+static unrelocated_addr
+dwarf2_find_max_address (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct attribute *attr;
+
+  attr = dwarf2_attr (die, DW_AT_high_pc, cu);
+  if (attr != nullptr)
+	  return attr->as_address ();
+
+  return (unrelocated_addr) 0;
 }
 
 /* Helper function that returns the proper abbrev section for

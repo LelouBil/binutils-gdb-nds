@@ -4887,7 +4887,8 @@ remote_target::print_one_stopped_thread (thread_info *thread)
 
   switch_to_thread (thread);
   thread->set_stop_pc (get_frame_pc (get_current_frame ()));
-  set_current_sal_from_frame (get_current_frame ());
+  // TODO OVERLAY
+  set_current_sal_from_frame (get_current_frame (), nullptr);
 
   /* For "info program".  */
   set_last_target_status (this, thread->ptid, ws);

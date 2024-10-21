@@ -1156,10 +1156,11 @@ do_print_thread (ui_out *uiout, const char *requested_threads,
     {
       /* The switch above put us at the top of the stack (leaf
 	 frame).  */
+      // TODO OVERLAY
       print_stack_frame (get_selected_frame (NULL),
 			 /* For MI output, print frame level.  */
 			 uiout->is_mi_like_p (),
-			 LOCATION, 0);
+			 LOCATION, 0, nullptr);
     }
 
   if (uiout->is_mi_like_p ())
