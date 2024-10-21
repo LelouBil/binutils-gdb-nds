@@ -1079,5 +1079,6 @@ extern void set_frame_previous_pc_masked (const frame_info_ptr &frame);
 
 extern bool get_frame_pc_masked (const frame_info_ptr &frame);
 
+extern obj_section * find_frame_section(CORE_ADDR pc);
 
 #endif /* !defined (FRAME_H)  */

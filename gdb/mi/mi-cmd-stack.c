@@ -784,7 +784,7 @@ mi_cmd_stack_info_frame (const char *command, const char *const *argv,
   if (argc > 0)
     error (_("-stack-info-frame: No arguments allowed"));
 
-  // TODO OVERLAY
+  obj_section * target_section = find_frame_section(get_frame_address_in_block(get_current_frame ()));
   print_frame_info (user_frame_print_options,
-		    get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 0, 1, nullptr);
+		    get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 0, 1, target_section);
 }

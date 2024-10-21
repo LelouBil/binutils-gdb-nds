@@ -736,8 +736,6 @@ continue_command (const char *args, int from_tty)
 
 /* Record in TP the starting point of a "step" or "next" command.  */
 
-static obj_section * find_frame_section(CORE_ADDR pc);
-
 static void
 set_step_frame (thread_info *tp)
 {
@@ -753,26 +751,6 @@ set_step_frame (thread_info *tp)
 
   CORE_ADDR pc = get_frame_pc (frame);
   tp->control.step_start_function = find_pc_function (pc);
-}
-
-// utility method which can identify the target section when we step
-// this works only because we are already stepping, so we know the relevant overlay is loaded.
-// in other areas this is not safe because e.g. a breakpoint may be placed in an unloaded overlay.
-static obj_section * find_frame_section(CORE_ADDR pc)
-{
-  gdbarch * gdbarch = get_current_arch();
-  if (gdbarch_overlay_update_p(gdbarch))
-  {
-    for (objfile *objfile : current_program_space->objfiles ())
-    {
-      for (obj_section *sect : objfile->sections ())
-      {
-        if (section_is_overlay(sect) && section_is_mapped(sect) && pc_in_mapped_range(pc, sect))
-          return sect;
-      }
-    }
-  }
-  return nullptr;
 }
 
 /* Step until outside of current statement.  */
@@ -978,8 +956,8 @@ prepare_one_step (thread_info *tp, struct step_command_fsm *sm)
 	      step_into_inline_frame (tp);
 
 	      frame = get_current_frame ();
-        // TODO OVERLAY
-	      sal = find_frame_sal (frame, nullptr);
+        obj_section * target_section = find_frame_section(get_frame_address_in_block(frame));
+	      sal = find_frame_sal (frame, target_section);
 	      sym = get_frame_function (frame);
 
 	      if (sym != nullptr)

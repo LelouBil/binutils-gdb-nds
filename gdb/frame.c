@@ -45,6 +45,7 @@
 #include "valprint.h"
 #include "cli/cli-option.h"
 #include "dwarf2/loc.h"
+#include "arch-utils.h"
 
 /* The sentinel frame terminates the innermost end of the frame chain.
    If unwound, it returns the information needed to construct an
@@ -2830,6 +2831,26 @@ get_frame_address_in_block (const frame_info_ptr &this_frame)
     return pc - 1;
 
   return pc;
+}
+
+// utility method which can identify the target section when we step
+// this works only because we are already stepping, so we know the relevant overlay is loaded.
+// in other areas this is not safe because e.g. a breakpoint may be placed in an unloaded overlay.
+obj_section * find_frame_section(CORE_ADDR pc)
+{
+  gdbarch * gdbarch = get_current_arch();
+  if (gdbarch_overlay_update_p(gdbarch))
+  {
+    for (objfile *objfile : current_program_space->objfiles ())
+    {
+      for (obj_section *sect : objfile->sections ())
+      {
+        if (section_is_overlay(sect) && section_is_mapped(sect) && pc_in_mapped_range(pc, sect))
+          return sect;
+      }
+    }
+  }
+  return nullptr;
 }
 
 bool

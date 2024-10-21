@@ -1506,8 +1506,8 @@ info_frame_command_core (const frame_info_ptr &fi, bool selected_frame_p)
 
   frame_pc_p = get_frame_pc_if_available (fi, &frame_pc);
   func = get_frame_function (fi);
-  // TODO OVERLAY
-  symtab_and_line sal = find_frame_sal (fi, nullptr);
+  obj_section * target_section = find_frame_section(frame_pc);
+  symtab_and_line sal = find_frame_sal (fi, target_section);
   s = sal.symtab;
   gdb::unique_xmalloc_ptr<char> func_only;
   if (func)
