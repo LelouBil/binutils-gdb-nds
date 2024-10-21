@@ -199,6 +199,8 @@ struct gdbarch
   ULONGEST displaced_step_buffer_length = 0;
   gdbarch_relocate_instruction_ftype *relocate_instruction = NULL;
   gdbarch_overlay_update_ftype *overlay_update = nullptr;
+  gdbarch_overlay_mapping_ftype *overlay_mapping = nullptr;
+  gdbarch_overlay_source_ftype *overlay_source = nullptr;
   gdbarch_core_read_description_ftype *core_read_description = nullptr;
   int sofun_address_maybe_missing = 0;
   gdbarch_process_record_ftype *process_record = nullptr;
@@ -468,6 +470,8 @@ verify_gdbarch (struct gdbarch *gdbarch)
     log.puts ("\n\tdisplaced_step_buffer_length");
   /* Skip verify of relocate_instruction, has predicate.  */
   /* Skip verify of overlay_update, has predicate.  */
+  /* Skip verify of overlay_mapping, has predicate.  */
+  /* Skip verify of overlay_source, has predicate.  */
   /* Skip verify of core_read_description, has predicate.  */
   /* Skip verify of sofun_address_maybe_missing, invalid_p == 0.  */
   /* Skip verify of process_record, has predicate.  */
@@ -1155,6 +1159,18 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   gdb_printf (file,
 	      "gdbarch_dump: overlay_update = <%s>\n",
 	      host_address_to_string (gdbarch->overlay_update));
+  gdb_printf (file,
+	      "gdbarch_dump: gdbarch_overlay_mapping_p() = %d\n",
+	      gdbarch_overlay_mapping_p (gdbarch));
+  gdb_printf (file,
+	      "gdbarch_dump: overlay_mapping = <%s>\n",
+	      host_address_to_string (gdbarch->overlay_mapping));
+  gdb_printf (file,
+	      "gdbarch_dump: gdbarch_overlay_source_p() = %d\n",
+	      gdbarch_overlay_source_p (gdbarch));
+  gdb_printf (file,
+	      "gdbarch_dump: overlay_source = <%s>\n",
+	      host_address_to_string (gdbarch->overlay_source));
   gdb_printf (file,
 	      "gdbarch_dump: gdbarch_core_read_description_p() = %d\n",
 	      gdbarch_core_read_description_p (gdbarch));
@@ -4333,6 +4349,54 @@ set_gdbarch_overlay_update (struct gdbarch *gdbarch,
 			    gdbarch_overlay_update_ftype overlay_update)
 {
   gdbarch->overlay_update = overlay_update;
+}
+
+bool
+gdbarch_overlay_mapping_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->overlay_mapping != NULL;
+}
+
+void
+gdbarch_overlay_mapping (struct gdbarch *gdbarch, std::string line)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->overlay_mapping != NULL);
+  if (gdbarch_debug >= 2)
+    gdb_printf (gdb_stdlog, "gdbarch_overlay_mapping called\n");
+  gdbarch->overlay_mapping (line);
+}
+
+void
+set_gdbarch_overlay_mapping (struct gdbarch *gdbarch,
+			     gdbarch_overlay_mapping_ftype overlay_mapping)
+{
+  gdbarch->overlay_mapping = overlay_mapping;
+}
+
+bool
+gdbarch_overlay_source_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->overlay_source != NULL;
+}
+
+struct obj_section *
+gdbarch_overlay_source (struct gdbarch *gdbarch, const char *filename)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->overlay_source != NULL);
+  if (gdbarch_debug >= 2)
+    gdb_printf (gdb_stdlog, "gdbarch_overlay_source called\n");
+  return gdbarch->overlay_source (filename);
+}
+
+void
+set_gdbarch_overlay_source (struct gdbarch *gdbarch,
+			    gdbarch_overlay_source_ftype overlay_source)
+{
+  gdbarch->overlay_source = overlay_source;
 }
 
 bool

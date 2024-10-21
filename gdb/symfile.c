@@ -60,6 +60,7 @@
 #include <ctype.h>
 #include <chrono>
 #include <algorithm>
+#include <fstream>
 
 int (*deprecated_ui_load_progress_hook) (const char *section,
 					 unsigned long num);
@@ -3372,6 +3373,33 @@ overlay_load_command (const char *args, int from_tty)
     error (_("This target does not know how to read its overlay state."));
 }
 
+static void
+overlay_map_command (const char *args, int from_tty)
+{
+  struct gdbarch *gdbarch = get_current_arch ();
+
+  if (args == NULL || strlen(args) == 0) {
+    error(_("The `overlay map` command requires a file path as input."));
+  }
+
+  if (gdbarch_overlay_mapping_p (gdbarch))
+  {
+    // read the filename from args
+    std::ifstream mapfile(args);
+    std::string line;
+    if (mapfile.is_open()) {
+      while (std::getline(mapfile, line)) {
+        gdbarch_overlay_mapping(gdbarch, line);
+      }
+      mapfile.close();
+    } else {
+      error(_("Unable to open overlay mapping file %s."), args);
+    }
+  }
+  else
+    error (_("This target does not know how to read its overlay state."));
+}
+
 /* Command list chain containing all defined "overlay" subcommands.  */
 static struct cmd_list_element *overlaylist;
 
@@ -3913,6 +3941,9 @@ on its own."), &cmdlist);
 
   add_com_alias ("ovly", overlay_cmd, class_support, 1);
   add_com_alias ("ov", overlay_cmd, class_support, 1);
+
+  add_cmd ("map", class_support, overlay_map_command,
+	   _("Read the overlay ID map from an external file."), &overlaylist);
 
   add_cmd ("map-overlay", class_support, map_overlay_command,
 	   _("Assert that an overlay section is mapped."), &overlaylist);

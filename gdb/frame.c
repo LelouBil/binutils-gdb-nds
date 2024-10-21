@@ -1853,7 +1853,8 @@ lookup_selected_frame (struct frame_id a_frame_id, int frame_level)
       /* For MI, we should probably have a notification about current
 	 frame change.  But this error is not very likely, so don't
 	 bother for now.  */
-      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
+      // TODO OVERLAY
+      print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1, nullptr);
     }
 }
 
@@ -2851,7 +2852,7 @@ get_frame_address_in_block_if_available (const frame_info_ptr &this_frame,
 }
 
 symtab_and_line
-find_frame_sal (const frame_info_ptr &frame)
+find_frame_sal (const frame_info_ptr &frame, struct obj_section * target_section)
 {
   frame_info_ptr next_frame;
   int notcurrent;
@@ -2903,7 +2904,13 @@ find_frame_sal (const frame_info_ptr &frame)
     return {};
 
   notcurrent = (pc != get_frame_address_in_block (frame));
-  return find_pc_line (pc, notcurrent);
+  
+  if (target_section == nullptr)
+  {
+    return find_pc_line(pc, notcurrent);
+  }
+
+  return find_pc_sect_line (pc, target_section, notcurrent);
 }
 
 /* Per "frame.h", return the ``address'' of the frame.  Code should

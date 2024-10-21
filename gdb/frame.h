@@ -82,6 +82,7 @@ struct gdbarch;
 struct ui_file;
 struct ui_out;
 struct frame_print_options;
+struct obj_section;
 
 /* The frame object.  */
 
@@ -564,12 +565,12 @@ extern bool get_frame_func_if_available (const frame_info_ptr &fi, CORE_ADDR *);
    find_frame_symtab(), find_frame_function().  Each will need to be
    carefully considered to determine if the real intent was for it to
    apply to the PC or the adjusted PC.  */
-extern symtab_and_line find_frame_sal (const frame_info_ptr &frame);
+extern symtab_and_line find_frame_sal (const frame_info_ptr &frame, struct obj_section *);
 
 /* Set the current source and line to the location given by frame
    FRAME, if possible.  */
 
-void set_current_sal_from_frame (const frame_info_ptr &);
+void set_current_sal_from_frame (const frame_info_ptr &, struct obj_section *);
 
 /* Return the frame base (what ever that is) (DEPRECATED).
 
@@ -879,12 +880,14 @@ extern void print_stack_frame_to_uiout (struct ui_out *uiout,
 
 extern void print_stack_frame (const frame_info_ptr &, int print_level,
 			       enum print_what print_what,
-			       int set_current_sal);
+			       int set_current_sal,
+                obj_section * target_section);
 
 extern void print_frame_info (const frame_print_options &fp_opts,
 			      const frame_info_ptr &, int print_level,
 			      enum print_what print_what, int args,
-			      int set_current_sal);
+			      int set_current_sal,
+               obj_section * target_section);
 
 extern frame_info_ptr block_innermost_frame (const struct block *);
 

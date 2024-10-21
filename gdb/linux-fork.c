@@ -781,7 +781,7 @@ linux_fork_context (struct fork_info *newfp, int from_tty)
   gdb_printf (_("Switching to %s\n"),
 	      target_pid_to_str (inferior_ptid).c_str ());
 
-  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
+  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1, nullptr);
 }
 
 /* Switch inferior process (checkpoint) context, by checkpoint id.  */

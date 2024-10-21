@@ -2933,69 +2933,76 @@ find_pc_sect_compunit_symtab (CORE_ADDR pc, struct obj_section *section)
   for (objfile *obj_file : current_program_space->objfiles ())
     {
       for (compunit_symtab *cust : obj_file->compunits ())
-	{
-	  const struct blockvector *bv = cust->blockvector ();
-	  const struct block *global_block = bv->global_block ();
-	  CORE_ADDR start = global_block->start ();
-	  CORE_ADDR end = global_block->end ();
-	  bool in_range_p = start <= pc && pc < end;
-	  if (!in_range_p)
-	    continue;
+      {
+        // for architectures with overlay mappings applied, only process compunits with a matching section name
+        // TODO OVERLAY
+        // how does this interact with standard BPs?
+        if (gdbarch_overlay_source_p(get_current_arch()) && gdbarch_overlay_source(get_current_arch(), cust->name) != section)
+        {
+            continue;
+        }
+        const struct blockvector *bv = cust->blockvector ();
+        const struct block *global_block = bv->global_block ();
+        CORE_ADDR start = global_block->start ();
+        CORE_ADDR end = global_block->end ();
+        bool in_range_p = start <= pc && pc < end;
+        if (!in_range_p)
+          continue;
 
-	  if (bv->map () != nullptr)
-	    {
-	      if (bv->map ()->find (pc) == nullptr)
-		continue;
+        if (bv->map () != nullptr)
+          {
+            if (bv->map ()->find (pc) == nullptr)
+        continue;
 
-	      return cust;
-	    }
+            return cust;
+          }
 
-	  CORE_ADDR range = end - start;
-	  if (best_cust != nullptr
-	      && range >= best_cust_range)
-	    /* Cust doesn't have a smaller range than best_cust, skip it.  */
-	    continue;
-	
-	  /* For an objfile that has its functions reordered,
-	     find_pc_psymtab will find the proper partial symbol table
-	     and we simply return its corresponding symtab.  */
-	  /* In order to better support objfiles that contain both
-	     stabs and coff debugging info, we continue on if a psymtab
-	     can't be found.  */
-	  struct compunit_symtab *result
-	    = obj_file->find_pc_sect_compunit_symtab (msymbol, pc,
-						      section, 0);
-	  if (result != nullptr)
-	    return result;
+        CORE_ADDR range = end - start;
+        if (best_cust != nullptr
+            && range >= best_cust_range)
+          /* Cust doesn't have a smaller range than best_cust, skip it.  */
+          continue;
+      
+        /* For an objfile that has its functions reordered,
+          find_pc_psymtab will find the proper partial symbol table
+          and we simply return its corresponding symtab.  */
+        /* In order to better support objfiles that contain both
+          stabs and coff debugging info, we continue on if a psymtab
+          can't be found.  */
+        struct compunit_symtab *result
+          = obj_file->find_pc_sect_compunit_symtab (msymbol, pc,
+                      section, 0);
+        if (result != nullptr)
+          return result;
 
-	  if (section != 0)
-	    {
-	      struct symbol *found_sym = nullptr;
+        if (section != 0)
+          {
+            struct symbol *found_sym = nullptr;
 
-	      for (int b_index = GLOBAL_BLOCK;
-		   b_index <= STATIC_BLOCK && found_sym == nullptr;
-		   ++b_index)
-		{
-		  const struct block *b = bv->block (b_index);
-		  for (struct symbol *sym : block_iterator_range (b))
-		    {
-		      if (matching_obj_sections (sym->obj_section (obj_file),
-						 section))
-			{
-			  found_sym = sym;
-			  break;
-			}
-		    }
-		}
-	      if (found_sym == nullptr)
-		continue;		/* No symbol in this symtab matches
-					   section.  */
-	    }
+            for (int b_index = GLOBAL_BLOCK;
+          b_index <= STATIC_BLOCK && found_sym == nullptr;
+          ++b_index)
+        {
+          const struct block *b = bv->block (b_index);
+          for (struct symbol *sym : block_iterator_range (b))
+            {
+              if (matching_obj_sections (sym->obj_section (obj_file),
+                section))
+          {
+            found_sym = sym;
+            break;
+          }
+            }
+        }
+            if (found_sym == nullptr)
+        continue;		/* No symbol in this symtab matches
+                section.  */
+          }
 
-	  /* Cust is best found so far, save it.  */
-	  best_cust = cust;
-	  best_cust_range = range;
-	}
+        /* Cust is best found so far, save it.  */
+        best_cust = cust;
+        best_cust_range = range;
+      }
     }
 
   if (best_cust != NULL)
@@ -3227,7 +3234,6 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 
   symtab_and_line val;
   val.pspace = current_program_space;
-
   cust = find_pc_sect_compunit_symtab (pc, section);
   if (cust == NULL)
     {

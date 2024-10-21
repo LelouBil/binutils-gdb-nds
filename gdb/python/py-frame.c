@@ -472,7 +472,7 @@ frapy_find_sal (PyObject *self, PyObject *args)
     {
       FRAPY_REQUIRE_VALID (self, frame);
 
-      symtab_and_line sal = find_frame_sal (frame);
+      symtab_and_line sal = find_frame_sal (frame, nullptr);
       sal_obj = symtab_and_line_to_sal_object (sal);
     }
   catch (const gdb_exception &except)

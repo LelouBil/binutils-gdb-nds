@@ -180,8 +180,16 @@ mi_cmd_stack_list_frames (const char *command, const char *const *argv,
 	  QUIT;
 	  /* Print the location and the address always, even for level 0.
 	     If args is 0, don't print the arguments.  */
+    bpstat * target_bpstat = inferior_ptid != null_ptid ? inferior_thread ()->control.stop_bpstat : nullptr;
+    obj_section * target_section = nullptr;
+
+    if (target_bpstat != nullptr && target_bpstat->bp_location_at != nullptr)
+    {
+      target_section = target_bpstat->bp_location_at->section;
+    }
+
 	  print_frame_info (user_frame_print_options,
-			    fi, 1, LOC_AND_ADDRESS, 0 /* args */, 0);
+			    fi, 1, LOC_AND_ADDRESS, 0 /* args */, 0, target_section);
 	}
     }
 }
@@ -776,6 +784,7 @@ mi_cmd_stack_info_frame (const char *command, const char *const *argv,
   if (argc > 0)
     error (_("-stack-info-frame: No arguments allowed"));
 
+  // TODO OVERLAY
   print_frame_info (user_frame_print_options,
-		    get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 0, 1);
+		    get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 0, 1, nullptr);
 }

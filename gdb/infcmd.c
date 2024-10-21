@@ -745,7 +745,8 @@ set_step_frame (thread_info *tp)
 
   frame_info_ptr frame = get_current_frame ();
 
-  symtab_and_line sal = find_frame_sal (frame);
+  // TODO OVERLAY
+  symtab_and_line sal = find_frame_sal (frame, nullptr);
   set_step_info (tp, frame, sal);
 
   CORE_ADDR pc = get_frame_pc (frame);
@@ -955,7 +956,8 @@ prepare_one_step (thread_info *tp, struct step_command_fsm *sm)
 	      step_into_inline_frame (tp);
 
 	      frame = get_current_frame ();
-	      sal = find_frame_sal (frame);
+        // TODO OVERLAY
+	      sal = find_frame_sal (frame, nullptr);
 	      sym = get_frame_function (frame);
 
 	      if (sym != nullptr)
@@ -1831,7 +1833,8 @@ finish_command (const char *arg, int from_tty)
       if (from_tty)
 	{
 	  gdb_printf (_("Run till exit from "));
-	  print_stack_frame (get_selected_frame (nullptr), 1, LOCATION, 0);
+    // TODO OVERLAY
+	  print_stack_frame (get_selected_frame (nullptr), 1, LOCATION, 0, nullptr);
 	}
 
       proceed ((CORE_ADDR) -1, GDB_SIGNAL_DEFAULT);
@@ -1881,7 +1884,8 @@ finish_command (const char *arg, int from_tty)
 	  gdb_printf (_("Run till exit from "));
 	}
 
-      print_stack_frame (callee_frame, 1, LOCATION, 0);
+      // TODO OVERLAY
+      print_stack_frame (callee_frame, 1, LOCATION, 0, nullptr);
     }
 
   if (execution_direction == EXEC_REVERSE)

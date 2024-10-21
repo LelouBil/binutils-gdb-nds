@@ -9449,26 +9449,35 @@ resolve_sal_pc (struct symtab_and_line *sal)
       bv = blockvector_for_pc_sect (sal->pc, 0, &b,
 				    sal->symtab->compunit ());
       if (bv != NULL)
-	{
-	  sym = b->linkage_function ();
-	  if (sym != NULL)
-	    sal->section
-	      = sym->obj_section (sal->symtab->compunit ()->objfile ());
-	  else
-	    {
-	      /* It really is worthwhile to have the section, so we'll
-		 just have to look harder. This case can be executed
-		 if we have line numbers but no functions (as can
-		 happen in assembly source).  */
+      {
+        sym = b->linkage_function ();
+        if (sym != NULL)
+          sal->section
+            = sym->obj_section (sal->symtab->compunit ()->objfile ());
+        else
+          {
+            /* It really is worthwhile to have the section, so we'll
+        just have to look harder. This case can be executed
+        if we have line numbers but no functions (as can
+        happen in assembly source).  */
 
-	      scoped_restore_current_pspace_and_thread restore_pspace_thread;
-	      switch_to_program_space_and_thread (sal->pspace);
+            scoped_restore_current_pspace_and_thread restore_pspace_thread;
+            switch_to_program_space_and_thread (sal->pspace);
 
-	      bound_minimal_symbol msym = lookup_minimal_symbol_by_pc (sal->pc);
-	      if (msym.minsym)
-		sal->section = msym.obj_section ();
-	    }
-	}
+            bound_minimal_symbol msym = lookup_minimal_symbol_by_pc (sal->pc);
+            if (msym.minsym)
+        sal->section = msym.obj_section ();
+          }
+      }
+      // if overlays are supported for this architecture, the section for this SAL may need to be overridden.
+      if (gdbarch_overlay_source_p(get_current_arch()))
+      {
+        obj_section *overlayed = gdbarch_overlay_source(get_current_arch(), lbasename(sal->symtab->filename));
+        if (overlayed != NULL)
+        {
+          sal->section = overlayed;
+        }
+      }
     }
 }
 

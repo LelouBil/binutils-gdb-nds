@@ -5084,7 +5084,8 @@ inline_frame_is_marked_for_skip (bool prev_frame, struct thread_info *tp)
       if (get_frame_type (frame) != INLINE_FRAME)
 	break;
 
-      sal = find_frame_sal (frame);
+      // TODO OVERLAY
+      sal = find_frame_sal (frame, nullptr);
       sym = get_frame_function (frame);
 
       if (sym != nullptr)
@@ -8123,7 +8124,8 @@ process_event_stop_test (struct execution_control_state *ecs)
     {
       infrun_debug_printf ("stepped into inlined function");
 
-      symtab_and_line call_sal = find_frame_sal (frame);
+      // TODO OVERLAY
+      symtab_and_line call_sal = find_frame_sal (frame, nullptr);
 
       if (ecs->event_thread->control.step_over_calls != STEP_OVER_ALL)
 	{
@@ -9291,6 +9293,13 @@ print_stop_location (const target_waitstatus &ws)
   int do_frame_printing = 1;
   struct thread_info *tp = inferior_thread ();
 
+  obj_section * target_section = nullptr;
+
+  if (tp->control.stop_bpstat != nullptr && tp->control.stop_bpstat->bp_location_at != nullptr)
+  {
+    target_section = tp->control.stop_bpstat->bp_location_at->section;
+  }
+
   bpstat_ret = bpstat_print (tp->control.stop_bpstat, ws.kind ());
   switch (bpstat_ret)
     {
@@ -9304,7 +9313,7 @@ print_stop_location (const target_waitstatus &ws)
 	  && (tp->control.step_start_function
 	      == find_pc_function (tp->stop_pc ())))
 	{
-	  symtab_and_line sal = find_frame_sal (get_selected_frame (nullptr));
+	  symtab_and_line sal = find_frame_sal (get_selected_frame (nullptr), target_section);
 	  if (sal.symtab != tp->current_symtab)
 	    {
 	      /* Finished step in same frame but into different file, print
@@ -9347,7 +9356,9 @@ print_stop_location (const target_waitstatus &ws)
      LOCATION: Print only location
      SRC_AND_LOC: Print location and source line.  */
   if (do_frame_printing)
-    print_stack_frame (get_selected_frame (nullptr), 0, source_flag, 1);
+  {
+    print_stack_frame (get_selected_frame (nullptr), 0, source_flag, 1, target_section);
+  }
 }
 
 /* See `print_stop_event` in infrun.h.  */
@@ -9620,7 +9631,15 @@ normal_stop ()
       select_frame (get_current_frame ());
 
       /* Set the current source location.  */
-      set_current_sal_from_frame (get_current_frame ());
+      bpstat * target_bpstat = inferior_ptid != null_ptid ? inferior_thread ()->control.stop_bpstat : nullptr;
+      obj_section * target_section = nullptr;
+
+      if (target_bpstat != nullptr && target_bpstat->bp_location_at != nullptr)
+      {
+        target_section = target_bpstat->bp_location_at->section;
+      }
+
+      set_current_sal_from_frame (get_current_frame (), target_section);
     }
 
   /* Look up the hook_stop and run it (CLI internally handles problem

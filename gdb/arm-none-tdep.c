@@ -30,6 +30,8 @@
 #include "objfiles.h"
 #include "gdbcore.h"
 
+#include <map>
+
 #ifdef HAVE_ELF
 #include "elf-none-tdep.h"
 #endif
@@ -193,6 +195,7 @@ arm_none_iterate_over_regset_sections (struct gdbarch *gdbarch,
 }
 
 static void nds_overlay_update(struct obj_section *osect);
+static void nds_overlay_mapping(std::string line);
 static int simple_read_overlay_table (void);
 
 static unsigned (*cache_ovly_table)[4] = 0;
@@ -200,8 +203,11 @@ static unsigned cache_novlys = 0;
 static CORE_ADDR cache_ovly_table_base = 0;
 enum ovly_index
   {
-    VMA, OSIZE, SECTION_ID, MAPPED
+    VMA, OSIZE, FS_OVERLAY_ID, MAPPED
   };
+
+static std::map<int, obj_section *> ovly_id_map;
+static std::map<std::string, obj_section *> ovly_source_map;
 
 static void
 simple_free_overlay_table (void)
@@ -276,19 +282,69 @@ static void nds_overlay_update(struct obj_section *osect)
   // therefore, we find the FIRST matching section, then break, and skip the remaining sections for that ovly.
   for (int idx = 0; idx < cache_novlys; idx++) 
   {
+    int fs_id = cache_ovly_table[idx][FS_OVERLAY_ID];
     for (objfile *objfile : current_program_space->objfiles ()) 
     {
       for (obj_section *sect : objfile->sections ()) 
       {
-        if (section_is_overlay (sect) && sect->the_bfd_section != NULL && cache_ovly_table[idx][OSIZE] != 0 && sect->the_bfd_section->id == cache_ovly_table[idx][SECTION_ID]) 
+        if (section_is_overlay (sect) && cache_ovly_table[idx][OSIZE] != 0 && ovly_id_map[fs_id] == sect) 
         {
           sect->ovly_mapped = cache_ovly_table[idx][MAPPED];
           // a horrific hack which should never be allowed. unfortunately it's required!
           sect->the_bfd_section->size = cache_ovly_table[idx][OSIZE];
+          sect->set_offset(0);
+          break;
         }
       }
     }
   }
+}
+
+// this is SUPER flaky but should work fine with well-formed inputs
+static void nds_overlay_mapping(std::string line)
+{
+  if (line.rfind("OVERLAY ", 0) == 0)
+  {
+    std::string sub = line.substr(8);
+    int index = sub.find(":");
+
+    std::string section_name = sub.substr(0, index);
+    int ovly_id = std::stoi(sub.substr(index + 1));
+
+    for (objfile *objfile : current_program_space->objfiles ()) {
+      for (obj_section *sect : objfile->sections ()) {
+        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+          ovly_id_map[ovly_id] = sect;
+          break;
+        }
+      }
+    }
+  }
+  else if (line.rfind("SOURCE ", 0) == 0)
+  {
+    std::string sub = line.substr (7);
+    int index = sub.find(":");
+
+    std::string source_name = sub.substr(0, index);
+    std::string section_name = sub.substr(index + 1);
+
+    for (objfile *objfile : current_program_space->objfiles ()) {
+      for (obj_section *sect : objfile->sections ()) {
+        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+          ovly_source_map[source_name] = sect;
+          break;
+        }
+      }
+    }
+  }
+}
+
+static obj_section *
+nds_overlay_source(const char * source)
+{
+  std::map<std::string, obj_section *>::iterator search = ovly_source_map.find(std::string(source));
+  if (search == ovly_source_map.end()) return NULL;
+  return search->second;
 }
 
 /* Initialize ARM bare-metal ABI info.  */
@@ -307,6 +363,8 @@ arm_none_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   /* Support custom overlay manager.  */
   set_gdbarch_overlay_update (gdbarch, nds_overlay_update);
+  set_gdbarch_overlay_mapping (gdbarch, nds_overlay_mapping);
+  set_gdbarch_overlay_source (gdbarch, nds_overlay_source);
 }
 
 /* Initialize ARM bare-metal target support.  */

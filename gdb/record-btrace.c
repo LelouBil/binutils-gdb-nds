@@ -2865,7 +2865,7 @@ record_btrace_set_replay (struct thread_info *tp,
   record_btrace_clear_histories (btinfo);
 
   tp->set_stop_pc (regcache_read_pc (get_thread_regcache (tp)));
-  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1);
+  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC, 1, nullptr);
 }
 
 /* The goto_record_begin method of target record-btrace.  */
