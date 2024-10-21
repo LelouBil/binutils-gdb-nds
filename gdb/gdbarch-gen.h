@@ -1217,12 +1217,12 @@ typedef void (gdbarch_overlay_update_ftype) (struct obj_section *osect);
 extern void gdbarch_overlay_update (struct gdbarch *gdbarch, struct obj_section *osect);
 extern void set_gdbarch_overlay_update (struct gdbarch *gdbarch, gdbarch_overlay_update_ftype *overlay_update);
 
-/* Load an overlay mapping from an input line. */
+/* Load an overlay mapping from an input file. */
 
 extern bool gdbarch_overlay_mapping_p (struct gdbarch *gdbarch);
 
-typedef void (gdbarch_overlay_mapping_ftype) (std::string line);
-extern void gdbarch_overlay_mapping (struct gdbarch *gdbarch, std::string line);
+typedef void (gdbarch_overlay_mapping_ftype) (char *mapfile);
+extern void gdbarch_overlay_mapping (struct gdbarch *gdbarch, char *mapfile);
 extern void set_gdbarch_overlay_mapping (struct gdbarch *gdbarch, gdbarch_overlay_mapping_ftype *overlay_mapping);
 
 /* Requests details on the mapping from a file to an overlay section. */

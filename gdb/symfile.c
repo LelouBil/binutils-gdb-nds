@@ -60,7 +60,6 @@
 #include <ctype.h>
 #include <chrono>
 #include <algorithm>
-#include <fstream>
 
 int (*deprecated_ui_load_progress_hook) (const char *section,
 					 unsigned long num);
@@ -3373,6 +3372,8 @@ overlay_load_command (const char *args, int from_tty)
     error (_("This target does not know how to read its overlay state."));
 }
 
+static char cached_ovly_map_file[256];
+
 static void
 overlay_map_command (const char *args, int from_tty)
 {
@@ -3384,20 +3385,21 @@ overlay_map_command (const char *args, int from_tty)
 
   if (gdbarch_overlay_mapping_p (gdbarch))
   {
-    // read the filename from args
-    std::ifstream mapfile(args);
-    std::string line;
-    if (mapfile.is_open()) {
-      while (std::getline(mapfile, line)) {
-        gdbarch_overlay_mapping(gdbarch, line);
-      }
-      mapfile.close();
-    } else {
-      error(_("Unable to open overlay mapping file %s."), args);
-    }
+    gdbarch_overlay_mapping(gdbarch, (char *) args);
   }
   else
-    error (_("This target does not know how to read its overlay state."));
+  {
+    // because VSC sucks, preserve the mapping file name. we will try to reload this once architecture is ready.
+    strcpy(cached_ovly_map_file, args);
+  }
+}
+
+void refresh_cached_overlay_map(struct gdbarch *gdbarch)
+{
+  if (gdbarch_overlay_mapping_p (gdbarch) && strlen(cached_ovly_map_file) != 0)
+  {
+    gdbarch_overlay_mapping(gdbarch, cached_ovly_map_file);
+  }
 }
 
 /* Command list chain containing all defined "overlay" subcommands.  */

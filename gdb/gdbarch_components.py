@@ -1987,11 +1987,11 @@ Refresh overlay mapped state for section OSECT.
 
 Function(
     comment="""
-Load an overlay mapping from an input line.
+Load an overlay mapping from an input file.
 """,
     type="void",
     name="overlay_mapping",
-    params=[("std::string", "line")],
+    params=[("char *", "mapfile")],
     predicate=True,
 )
 

@@ -4359,13 +4359,13 @@ gdbarch_overlay_mapping_p (struct gdbarch *gdbarch)
 }
 
 void
-gdbarch_overlay_mapping (struct gdbarch *gdbarch, std::string line)
+gdbarch_overlay_mapping (struct gdbarch *gdbarch, char *mapfile)
 {
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->overlay_mapping != NULL);
   if (gdbarch_debug >= 2)
     gdb_printf (gdb_stdlog, "gdbarch_overlay_mapping called\n");
-  gdbarch->overlay_mapping (line);
+  gdbarch->overlay_mapping (mapfile);
 }
 
 void

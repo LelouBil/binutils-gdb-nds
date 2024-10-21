@@ -31,6 +31,7 @@
 #include "gdbcore.h"
 
 #include <map>
+#include <fstream>
 
 #ifdef HAVE_ELF
 #include "elf-none-tdep.h"
@@ -195,7 +196,7 @@ arm_none_iterate_over_regset_sections (struct gdbarch *gdbarch,
 }
 
 static void nds_overlay_update(struct obj_section *osect);
-static void nds_overlay_mapping(std::string line);
+static void nds_overlay_mapping(char * filename);
 static int simple_read_overlay_table (void);
 
 static unsigned (*cache_ovly_table)[4] = 0;
@@ -301,42 +302,52 @@ static void nds_overlay_update(struct obj_section *osect)
 }
 
 // this is SUPER flaky but should work fine with well-formed inputs
-static void nds_overlay_mapping(std::string line)
+static void nds_overlay_mapping(char * filename)
 {
-  if (line.rfind("OVERLAY ", 0) == 0)
-  {
-    std::string sub = line.substr(8);
-    int index = sub.find(":");
+  std::string line;
+  std::ifstream mapfile(filename);
+  if (mapfile.is_open()) {
+    while (std::getline(mapfile, line)) {
+      if (line.rfind("OVERLAY ", 0) == 0)
+      {
+        std::string sub = line.substr(8);
+        int index = sub.find(":");
 
-    std::string section_name = sub.substr(0, index);
-    int ovly_id = std::stoi(sub.substr(index + 1));
+        std::string section_name = sub.substr(0, index);
+        int ovly_id = std::stoi(sub.substr(index + 1));
 
-    for (objfile *objfile : current_program_space->objfiles ()) {
-      for (obj_section *sect : objfile->sections ()) {
-        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
-          ovly_id_map[ovly_id] = sect;
-          break;
+        for (objfile *objfile : current_program_space->objfiles ()) {
+          for (obj_section *sect : objfile->sections ()) {
+            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+              ovly_id_map[ovly_id] = sect;
+              break;
+            }
+          }
+        }
+      }
+      else if (line.rfind("SOURCE ", 0) == 0)
+      {
+        std::string sub = line.substr (7);
+        int index = sub.find(":");
+
+        std::string source_name = sub.substr(0, index);
+        std::string section_name = sub.substr(index + 1);
+
+        for (objfile *objfile : current_program_space->objfiles ()) {
+          for (obj_section *sect : objfile->sections ()) {
+            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+              ovly_source_map[source_name] = sect;
+              break;
+            }
+          }
         }
       }
     }
+    mapfile.close();
   }
-  else if (line.rfind("SOURCE ", 0) == 0)
-  {
-    std::string sub = line.substr (7);
-    int index = sub.find(":");
 
-    std::string source_name = sub.substr(0, index);
-    std::string section_name = sub.substr(index + 1);
-
-    for (objfile *objfile : current_program_space->objfiles ()) {
-      for (obj_section *sect : objfile->sections ()) {
-        if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
-          ovly_source_map[source_name] = sect;
-          break;
-        }
-      }
-    }
-  }
+  breakpoint_re_set ();
+  insert_breakpoints ();
 }
 
 static obj_section *
@@ -365,6 +376,8 @@ arm_none_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_overlay_update (gdbarch, nds_overlay_update);
   set_gdbarch_overlay_mapping (gdbarch, nds_overlay_mapping);
   set_gdbarch_overlay_source (gdbarch, nds_overlay_source);
+  // if cached_map_file is set, try to initialize map
+  refresh_cached_overlay_map(gdbarch);
 }
 
 /* Initialize ARM bare-metal target support.  */
