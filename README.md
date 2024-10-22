@@ -94,3 +94,14 @@ SOURCE fieldmap.c:overlay5
 ```
 
 I'd recommend building this in your build system automatically (see e.g. https://github.com/joshua-smith-12/pokeplatinum/blob/gdb/tools/debug/overlay_mapper.py)
+
+## Commands
+
+In GDB, run these commands to enable overlay debugging:
+
+```
+overlay auto
+overlay map <path/to/map/file>
+```
+
+Or review the launch.json here for VSCode integration: https://github.com/joshua-smith-12/pokeplatinum/blob/gdb/.vscode/launch.json
