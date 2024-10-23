@@ -7151,6 +7151,25 @@ handle_signal_stop (struct execution_control_state *ecs)
     = !bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
 			       ecs->event_thread->stop_signal ());
 
+  if (random_signal && ecs->event_thread->control.stop_bpstat != nullptr && ecs->event_thread->control.stop_bpstat->bp_location_at != nullptr && ecs->event_thread->control.stop_bpstat->bp_location_at->section != nullptr) 
+  {
+    if (section_is_overlay(ecs->event_thread->control.stop_bpstat->bp_location_at->section) && !section_is_mapped(ecs->event_thread->control.stop_bpstat->bp_location_at->section))
+    {
+      infrun_debug_printf (_("random signal at inactive overlay section, ignoring\n"));
+	    random_signal = 0;
+    }
+  }
+
+  if (random_signal)
+  {
+    struct obj_section * frame_sect = find_frame_section(get_frame_address_in_block(frame));
+    if (section_is_overlay(frame_sect) && ecs->event_thread->control.stop_bpstat == nullptr)
+    {
+      infrun_debug_printf (_("buggy signal at overlay section, ignoring\n"));
+	    random_signal = 0;
+    }
+  }
+
   /* Maybe this was a trap for a software breakpoint that has since
      been removed.  */
   if (random_signal && target_stopped_by_sw_breakpoint ())
