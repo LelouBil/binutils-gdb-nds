@@ -30,8 +30,10 @@
 #include "objfiles.h"
 #include "gdbcore.h"
 
+#include "gdbsupport/filestuff.h"
+#include "utils.h"
+
 #include <map>
-#include <fstream>
 
 #ifdef HAVE_ELF
 #include "elf-none-tdep.h"
@@ -301,49 +303,78 @@ static void nds_overlay_update(struct obj_section *osect)
   }
 }
 
+std::vector<std::string> split_string(const std::string& str,
+                                      const std::string& delimiter)
+{
+    std::vector<std::string> strings;
+
+    std::string::size_type pos = 0;
+    std::string::size_type prev = 0;
+    while ((pos = str.find(delimiter, prev)) != std::string::npos)
+    {
+        strings.push_back(str.substr(prev, pos - prev));
+        prev = pos + delimiter.size();
+    }
+
+    // To get the last substring (or only, if delimiter is not found)
+    strings.push_back(str.substr(prev));
+
+    return strings;
+}
+
 // this is SUPER flaky but should work fine with well-formed inputs
 static void nds_overlay_mapping(char * filename)
 {
-  std::string line;
-  std::ifstream mapfile(filename);
-  if (mapfile.is_open()) {
-    while (std::getline(mapfile, line)) {
-      if (line.rfind("OVERLAY ", 0) == 0)
-      {
-        std::string sub = line.substr(8);
-        int index = sub.find(":");
+  scoped_fd mapfd(gdb_open_cloexec(filename, O_RDONLY,0));
+  if (mapfd.get () < 0)
+    return; // no error handling
+  struct stat st;
+  if (fstat (mapfd.get (), &st) < 0)
+    return; // no error handling
+  
+  std::string lines;
+  lines.resize (st.st_size);
+  if (myread (mapfd.get (), &lines[0], lines.size ()) < 0)
+    return; // no error handling
+  
+  std::vector<std::string> ::iterator it;
+  std::vector<std::string> split_lines = split_string(lines,"\n");
+  for(it=split_lines.begin();it!=split_lines.end();it++) {
+    std::string line = *it;
+    if (line.rfind("OVERLAY ", 0) == 0)
+    {
+      std::string sub = line.substr(8);
+      int index = sub.find(":");
 
-        std::string section_name = sub.substr(0, index);
-        int ovly_id = std::stoi(sub.substr(index + 1));
+      std::string section_name = sub.substr(0, index);
+      int ovly_id = std::stoi(sub.substr(index + 1));
 
-        for (objfile *objfile : current_program_space->objfiles ()) {
-          for (obj_section *sect : objfile->sections ()) {
-            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
-              ovly_id_map[ovly_id] = sect;
-              break;
-            }
-          }
-        }
-      }
-      else if (line.rfind("SOURCE ", 0) == 0)
-      {
-        std::string sub = line.substr (7);
-        int index = sub.find(":");
-
-        std::string source_name = sub.substr(0, index);
-        std::string section_name = sub.substr(index + 1);
-
-        for (objfile *objfile : current_program_space->objfiles ()) {
-          for (obj_section *sect : objfile->sections ()) {
-            if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
-              ovly_source_map[source_name] = sect;
-              break;
-            }
+      for (objfile *objfile : current_program_space->objfiles ()) {
+        for (obj_section *sect : objfile->sections ()) {
+          if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+            ovly_id_map[ovly_id] = sect;
+            break;
           }
         }
       }
     }
-    mapfile.close();
+    else if (line.rfind("SOURCE ", 0) == 0)
+    {
+      std::string sub = line.substr (7);
+      int index = sub.find(":");
+
+      std::string source_name = sub.substr(0, index);
+      std::string section_name = sub.substr(index + 1);
+
+      for (objfile *objfile : current_program_space->objfiles ()) {
+        for (obj_section *sect : objfile->sections ()) {
+          if (section_is_overlay (sect) && strcmp(sect->the_bfd_section->name, section_name.c_str()) == 0) {
+            ovly_source_map[source_name] = sect;
+            break;
+          }
+        }
+      }
+    }
   }
 
   breakpoint_re_set ();
